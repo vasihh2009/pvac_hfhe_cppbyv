@@ -26,6 +26,13 @@ added the diagnostic test_hg to check whether a hypergraph H has one giant compo
 make test-hg
 ```
 
+## update dec 4
+added improvements against timing attacks (from previous versions) and a test for prf
+
+```bash
+make test-prf
+```
+
 ## usage
 ```cpp
 #include <pvac/pvac.hpp>
