@@ -7,6 +7,8 @@
 #include <random>
 
 #include <pvac/pvac.hpp>
+#include <pvac/core/ct_safe.hpp>
+
 
 using namespace pvac;
 
@@ -126,10 +128,10 @@ size_t ct_mem(const Cipher& c) {
 
 
 void pr_analysis(const std::string& name, const Cipher& c) {
-    std::cout << "   " << name << ": e = " << c.E.size() << " L = " << c.L.size() 
+    std::cout << "" << name << ": e = " << c.E.size() << " L = " << c.L.size() 
 
-              << " bal = " << std::fixed << std::setprecision(2) << bit_bal(c)
-              << " s_ent = " << s_byte_ent(c) << " mem = " << ct_mem(c) << " b\n";
+              << "bal = " << std::fixed << std::setprecision(2) << bit_bal(c)
+              << "s_ent = " << s_byte_ent(c) << " mem = " << ct_mem(c) << "b\n";
 }
 
 template<typename F>
@@ -171,54 +173,43 @@ int main() {
     must(dec_value(pk, sk, X).lo == x, "dec(X)", &pk, &X);
         must(dec_value(pk, sk, Y).lo == y, "dec(Y)", &pk, &Y);
         must(dec_value(pk, sk, Zc).lo == z, "dec(Z)", &pk, &Zc);
-    std::cout << "   dec ok\n";
+    std::cout << "dec ok\n";
 
     Cipher S = ct_add(pk, X, Y);
     must(dec_value(pk, sk, S).lo == x + y, "add", &pk, &S);
 
     Cipher D = ct_sub(pk, X, Y);
-    must(fp_eq(dec_value(pk, sk, D), fp_sub(fp_from_u64(x), fp_from_u64(y))), "sub", &pk, &D);
+    must(ct::fp_eq(dec_value(pk, sk, D), fp_sub(fp_from_u64(x), fp_from_u64(y))), "sub", &pk, &D);
 
     Cipher P = ct_mul(pk, X, Y);
     u128 prod = (u128)x * (u128)y;
     Fp expP = fp_from_words((uint64_t)prod, (uint64_t)(prod >> 64) & MASK63);
-    must(fp_eq(dec_value(pk, sk, P), expP), "mul", &pk, &P);
-    std::cout << "   add / sub / mul ok\n";
+    must(ct::fp_eq(dec_value(pk, sk, P), expP), "mul", &pk, &P);
+    std::cout << "add / sub / mul ok\n";
 
     std::cout << "\n- edge cases -\n";
     Cipher C0 = enc_value(pk, sk, 0);
     Cipher C1 = enc_value(pk, sk, 1);
     must(dec_value(pk, sk, C0).lo == 0, "enc(0)", &pk, &C0);
     must(dec_value(pk, sk, C1).lo == 1, "enc(1)", &pk, &C1);
-
     must(dec_value(pk, sk, ct_add(pk, X, C0)).lo == x, "x + 0 = x", &pk, &X);
     must(dec_value(pk, sk, ct_mul(pk, X, C1)).lo == x, "x * 1 = x", &pk, &X);
-
-
-
-
-
     must(dec_value(pk, sk, ct_mul(pk, X, C0)).lo == 0, "x * 0 = 0", &pk, &X);
     must(dec_value(pk, sk, ct_sub(pk, X, X)).lo == 0, "x - x = 0", &pk, &X);
-    std::cout << "   0 / 1 identities ok\n";
-
+    std::cout << "0 / 1 identities ok\n";
     Cipher neg_one = ct_sub(pk, C0, C1);
     Fp dec_neg = dec_value(pk, sk, neg_one);
     Fp exp_neg = fp_sub(fp_from_u64(0), fp_from_u64(1));
-    must(fp_eq(dec_neg, exp_neg), "0 - 1 = p - 1", &pk, &neg_one);
+    must(ct::fp_eq(dec_neg, exp_neg), "0 - 1 = p - 1", &pk, &neg_one);
 
     Cipher wrap = ct_add(pk, neg_one, C1);
     must(dec_value(pk, sk, wrap).lo == 0, "(p - 1) + 1 = 0", &pk, &wrap);
-    std::cout << "   modular wrap ok\n";
+    std::cout << "modular wrap ok\n";
     std::cout << "\n- extra : 30 random ops \n";
     std::vector<Cipher> pool;
     pool.push_back(enc_value(pk, sk, g_rng() % 100 + 1));
     pool.push_back(enc_value(pk, sk, g_rng() % 100 + 1));
     pool.push_back(enc_value(pk, sk, g_rng() % 100 + 1));
-
-
-
-
 
     // new ? 
 
@@ -238,18 +229,18 @@ int main() {
         pool.push_back(res);
         if (pool.size() > 10) pool.erase(pool.begin());
     }
-    std::cout << "   ops: add = " << add_cnt << " sub = " << sub_cnt << " mul = " << mul_cnt << "\n";
-    std::cout << "   pool size = " << pool.size() << " ok\n";
+    std::cout << "ops: add = " << add_cnt << " sub = " << sub_cnt << " mul = " << mul_cnt << "\n";
+    std::cout << "pool size = " << pool.size() << " ok\n";
     std::cout << "\n- algebra -\n";
-    must(fp_eq(dec_value(pk, sk, ct_mul(pk, X, Y)), dec_value(pk, sk, ct_mul(pk, Y, X))), "commut", &pk, &P);
+    must(ct::fp_eq(dec_value(pk, sk, ct_mul(pk, X, Y)), dec_value(pk, sk, ct_mul(pk, Y, X))), "commut", &pk, &P);
     
     Cipher A1 = ct_mul(pk, ct_mul(pk, X, Y), Zc);
     Cipher A2 = ct_mul(pk, X, ct_mul(pk, Y, Zc));
-    must(fp_eq(dec_value(pk, sk, A1), dec_value(pk, sk, A2)), "assoc", &pk, &A1);
+    must(ct::fp_eq(dec_value(pk, sk, A1), dec_value(pk, sk, A2)), "assoc", &pk, &A1);
 
     Cipher L1 = ct_mul(pk, X, ct_add(pk, Y, Zc));
     Cipher L2 = ct_add(pk, ct_mul(pk, X, Y), ct_mul(pk, X, Zc));
-    must(fp_eq(dec_value(pk, sk, L1), dec_value(pk, sk, L2)), "distrib", &pk, &L1);
+    must(ct::fp_eq(dec_value(pk, sk, L1), dec_value(pk, sk, L2)), "distrib", &pk, &L1);
     std::cout << "commut / assoc / distrib ok\n";
 
     std::cout << "\n- linear combo: 3x + 5y - 2z -\n";
@@ -257,7 +248,7 @@ int main() {
     Cipher lin = ct_sub(pk, ct_add(pk, ct_scale(pk, X, c3), ct_scale(pk, Y, c5)), ct_scale(pk, Zc, c2));
 
     Fp exp_lin = fp_sub(fp_add(fp_mul(fp_from_u64(x), c3), fp_mul(fp_from_u64(y), c5)), fp_mul(fp_from_u64(z), c2));
-    must(fp_eq(dec_value(pk, sk, lin), exp_lin), "linear", &pk, &lin);
+    must(ct::fp_eq(dec_value(pk, sk, lin), exp_lin), "linear", &pk, &lin);
     std::cout << "   3 * " << x << " + 5 * " << y << " - 2 * " << z << " = " << exp_lin.lo << " ok\n";
 
     std::cout << "\n- poly: f(x) = x^3 - 2x^2 + 5x - 7 -\n";
@@ -271,7 +262,7 @@ int main() {
     );
     uint64_t exp_poly = v * v * v - 2 * v * v + 5 * v - 7;
     must(dec_value(pk, sk, poly).lo == exp_poly, "poly", &pk, &poly);
-    std::cout << "   f(10) = " << exp_poly << " ok\n";
+    std::cout << "f(10) = " << exp_poly << " ok\n";
 
     std::cout << "\n- quadratic: (a + b)^2 = a^2 + 2ab + b^2 -\n";
     Cipher sum_sq = ct_mul(pk, ct_add(pk, X, Y), ct_add(pk, X, Y));
@@ -279,28 +270,28 @@ int main() {
     Cipher Y2 = ct_mul(pk, Y, Y);
     Cipher XY2 = ct_scale(pk, ct_mul(pk, X, Y), fp_from_u64(2));
     Cipher expand = ct_add(pk, ct_add(pk, X2, XY2), Y2);
-    must(fp_eq(dec_value(pk, sk, sum_sq), dec_value(pk, sk, expand)), "quad", &pk, &sum_sq);
-    std::cout << "   (a + b)^2 expansion ok\n";
+    must(ct::fp_eq(dec_value(pk, sk, sum_sq), dec_value(pk, sk, expand)), "quad", &pk, &sum_sq);
+    std::cout << "(a + b)^2 expansion ok\n";
 
     std::cout << "\n- corr test -\n";
     Cipher X_copy = enc_value(pk, sk, x);
     double corr = ct_corr(X, X_copy);
-    std::cout << "   corr(enc(x), enc(x)) = " << corr << " (exp ~ " << pk.prm.m_bits / 2 << ")\n";
+    std::cout << "corr(enc(x), enc(x)) = " << corr << " (exp ~ " << pk.prm.m_bits / 2 << ")\n";
     must(X.E[0].w.lo != X_copy.E[0].w.lo, "diff rnd", &pk, &X_copy);
 
     std::cout << "\n- recrypt -\n";
     Cipher X3 = ct_mul(pk, ct_mul(pk, X, X), X);
-    std::cout << "   before: bal = " << bit_bal(X3) << " s_ent = " << s_byte_ent(X3) << " L = " << X3.L.size() << "\n";
+    std::cout << "before: bal = " << bit_bal(X3) << " s_ent = " << s_byte_ent(X3) << " L = " << X3.L.size() << "\n";
     Cipher U = ct_recrypt(pk, ek, X3);
-    std::cout << "   after:  bal = " << bit_bal(U) << " s_ent = " << s_byte_ent(U) << " L = " << U.L.size() << "\n";
-    must(fp_eq(dec_value(pk, sk, U), dec_value(pk, sk, X3)), "recrypt", &pk, &U);
+    std::cout << "after:  bal = " << bit_bal(U) << " s_ent = " << s_byte_ent(U) << " L = " << U.L.size() << "\n";
+    must(ct::fp_eq(dec_value(pk, sk, U), dec_value(pk, sk, X3)), "recrypt", &pk, &U);
 
     std::cout << "\n- chain 2^10 -\n";
     const int N = 10;
     Cipher chain = enc_value(pk, sk, 2);
     for (int i = 1; i < N; i++) chain = ct_mul(pk, chain, enc_value(pk, sk, 2));
     must(dec_value(pk, sk, chain).lo == (1ULL << N), "2^10", &pk, &chain);
-    std::cout << "   2^10 = " << (1ULL << N) << " ok\n";
+    std::cout << "2^10 = " << (1ULL << N) << " ok\n";
     pr_analysis("chain", chain);
 
     std::cout << "\n- chain with recrypt -\n";
@@ -312,14 +303,14 @@ int main() {
         if (i % REC_INT == 0) { chain_r = ct_recrypt(pk, ek, chain_r); rec_cnt++; }
     }
     must(dec_value(pk, sk, chain_r).lo == (1ULL << N), "2^10 rec", &pk, &chain_r);
-    std::cout << "   recrypt calls = " << rec_cnt << "\n";
+    std::cout << "recrypt calls = " << rec_cnt << "\n";
     pr_analysis("chain_r", chain_r);
 
     std::cout << "\n- 10! -\n";
     Cipher fact = enc_value(pk, sk, 1);
     for (uint64_t i = 2; i <= 10; i++) fact = ct_mul(pk, fact, enc_value(pk, sk, i));
     must(dec_value(pk, sk, fact).lo == 3628800, "10!", &pk, &fact);
-    std::cout << "   10! = 3628800 ok\n";
+    std::cout << "10! = 3628800 ok\n";
 
     std::cout << "\n- commit -\n";
     auto cX = commit_ct(pk, X);
@@ -332,14 +323,14 @@ int main() {
     std::cout << "\n- ubk -\n";
     Cipher P_ubk = P;
     ubk_apply(pk, P_ubk);
-    must(fp_eq(dec_value(pk, sk, P_ubk), dec_value(pk, sk, P)), "ubk stable", &pk, &P_ubk);
-    std::cout << "   ubk preserves value ok\n";
+    must(ct::fp_eq(dec_value(pk, sk, P_ubk), dec_value(pk, sk, P)), "ubk stable", &pk, &P_ubk);
+    std::cout << "ubk preserves value ok\n";
 
 
     std::cout << "\n- weight dist -\n";
     std::map<int, int> w_dist;
     for (const auto& e : P.E) w_dist[hw64(e.w.lo) / 8]++;
-    std::cout << "   hw buckets (0-7, 8-15, ...): ";
+    std::cout << "hw buckets (0-7, 8-15, ...): ";
     for (auto& [bucket, cnt] : w_dist) std::cout << bucket * 8 << "-" << (bucket * 8 + 7) << ":" << cnt << " ";
     std::cout << "\n";
 
@@ -355,16 +346,16 @@ int main() {
 
 
 
-    std::cout << " enc: " << std::setw(8) << t_enc << " us\n";
+    std::cout << "enc: " << std::setw(8) << t_enc << " us\n";
 
     
-    std::cout << " add: " << std::setw(8) << t_add << " us\n";
+    std::cout << "add: " << std::setw(8) << t_add << " us\n";
     
-    std::cout << " mul: " << std::setw(8) << t_mul << " us\n";
+    std::cout << "mul: " << std::setw(8) << t_mul << " us\n";
     
-    std::cout << " dec: " << std::setw(8) << t_dec << " us\n";
+    std::cout << "dec: " << std::setw(8) << t_dec << " us\n";
     
-    std::cout << " recrypt: " << std::setw(8) << t_rec << " us\n";
+    std::cout << "recrypt: " << std::setw(8) << t_rec << " us\n";
 
     std::cout << "\n- analysis -\n";
     

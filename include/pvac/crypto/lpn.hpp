@@ -8,6 +8,8 @@
 #include "../core/hash.hpp"
 #include "toeplitz.hpp"
 
+#include "../core/ct_safe.hpp"
+
 namespace pvac {
 
 // 128 bit

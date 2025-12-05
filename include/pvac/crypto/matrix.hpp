@@ -30,7 +30,7 @@ inline std::vector<int> prg_choose_k(
 
         void refill() {
             uint8_t out[32];
-            Sha256  s;
+            Sha256 s;
 
             s.init();
             s.update(L, std::strlen(L));
@@ -99,15 +99,15 @@ inline Ubk gen_ubk_public(uint64_t canon_tag, int m_bits) {
     struct Ctr {
         uint64_t tag;
         uint64_t c;
-        uint8_t  b[32];
-        int      idx;
+        uint8_t b[32];
+        int idx;
 
         Ctr(uint64_t t) : tag(t), c(0), idx(32) {}
 
         uint64_t r() {
             if (idx >= 32) {
                 uint8_t out[32];
-                Sha256  s;
+                Sha256 s;
 
                 s.init();
                 s.update("UBK", 3);
@@ -158,7 +158,7 @@ inline Ubk gen_ubk_public(uint64_t canon_tag, int m_bits) {
 
     Ubk u;
     u.perm = std::move(perm);
-    u.inv  = std::move(inv);
+    u.inv = std::move(inv);
 
     return u;
 }
@@ -171,9 +171,9 @@ inline BitVec apply_perm_sigma(const BitVec & v, const std::vector<int> & inv) {
         uint64_t x = v.w[wi];
 
         while (x) {
-            uint64_t b   = x & -x;
+            uint64_t b = x & -x;
             unsigned bit = __builtin_ctzll(x);
-            size_t   src = (wi << 6) + bit;
+            size_t src = (wi << 6) + bit;
 
             if (src < v.nbits) {
                 int j = inv[src];
@@ -189,8 +189,8 @@ inline BitVec apply_perm_sigma(const BitVec & v, const std::vector<int> & inv) {
 
 // sparse parity check
 inline void gen_H(PubKey & pk) {
-    int m  = pk.prm.m_bits;
-    int n  = pk.prm.n_bits;
+    int m = pk.prm.m_bits;
+    int n = pk.prm.n_bits;
     int wt = pk.prm.h_col_wt;
 
     pk.H.resize(n, BitVec::make(m));
@@ -217,17 +217,17 @@ inline void gen_H(PubKey & pk) {
 
     // digest for verif
     Sha256 s;
+    
     s.init();
     s.update("H|v2", 4);
-
     sha256_acc_u64(s, pk.prm.m_bits);
     sha256_acc_u64(s, pk.prm.n_bits);
     sha256_acc_u64(s, pk.prm.h_col_wt);
 
     for (const auto & col : pk.H) {
         size_t bytes = (col.nbits + 7) / 8;
-        size_t full  = bytes / 8;
-        size_t rem   = bytes % 8;
+        size_t full = bytes / 8;
+        size_t rem = bytes % 8;
 
         for (size_t i = 0; i < full; i++) {
             uint8_t b[8];
@@ -236,7 +236,7 @@ inline void gen_H(PubKey & pk) {
         }
 
         if (rem) {
-            uint8_t  b[8];
+            uint8_t b[8];
             uint64_t x = col.w[full];
 
             for (size_t j = 0; j < rem; j++) {
@@ -255,25 +255,22 @@ inline uint64_t prg_layer_ztag(uint64_t canon_tag, Nonce128 n) {
     Sha256 s;
     s.init();
     s.update(Dom::ZTAG, std::strlen(Dom::ZTAG));
-
     sha256_acc_u64(s, canon_tag);
     sha256_acc_u64(s, n.lo);
     sha256_acc_u64(s, n.hi);
-
     uint8_t out[32];
     s.finish(out);
-
     return load_le64(out);
 }
 
 // xor of x_col_wt columns from H + err_wt noise bits (will check next)
 inline BitVec sigma_from_H(
     const PubKey & pk,
-    uint64_t       ztag,
-    Nonce128       nonce,
-    uint16_t       idx,
-    uint8_t        ch,
-    uint64_t       salt // (?)
+    uint64_t ztag,
+    Nonce128 nonce,
+    uint16_t idx,
+    uint8_t ch,
+    uint64_t salt // (?)
 ) {
     int m = pk.prm.m_bits;
     int n = pk.prm.n_bits;

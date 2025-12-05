@@ -6,6 +6,7 @@
 
 #include "../core/types.hpp"
 #include "../ops/encrypt.hpp"
+#include "../core/ct_safe.hpp"
 
 namespace pvac {
 
@@ -37,6 +38,33 @@ inline void dump_metrics(
       << std::fixed << std::setprecision(6) << dens << ","
       << val.lo << ","
       << val.hi << "\n";
+}
+
+inline double sigma_shannon(const Cipher& C) {
+    if (C.E.empty()) return 0.0;
+    
+    std::array<int, 256> freq{};
+    int total = 0;
+    
+    for (const auto& e : C.E) {
+        for (auto w : e.s.w) {
+            for (int i = 0; i < 8; i++) {
+                freq[(w >> (i * 8)) & 0xFF]++;
+                total++;
+            }
+        }
+    }
+    
+    if (total == 0) return 0.0;
+    
+    double H = 0.0;
+    for (int i = 0; i < 256; i++) {
+        if (freq[i] > 0) {
+            double p = (double)freq[i] / total;
+            H -= p * std::log2(p);
+        }
+    }
+    return H; 
 }
 
 inline Fp agg_layer_gsum(const PubKey & pk, const Cipher & X, uint32_t lid) {
@@ -75,7 +103,7 @@ inline bool check_mul_gsum_all(
             Fp bb = agg_layer_gsum(pk, B, lb);
             Fp cc = agg_layer_gsum(pk, C, lc);
 
-            if (!fp_eq(cc, fp_mul(aa, bb))) {
+            if (!ct::fp_eq(cc, fp_mul(aa, bb))) {
                 return false;
             }
         }

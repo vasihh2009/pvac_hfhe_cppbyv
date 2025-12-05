@@ -31,8 +31,8 @@ inline Fp fp_from_words(uint64_t lo, uint64_t hi) {
     lo = (uint64_t)t;
     hi += (uint64_t)(t >> 64);
 
-    uint64_t lo2    = lo;
-    uint64_t hi2    = hi;
+    uint64_t lo2 = lo;
+    uint64_t hi2 = hi;
     uint64_t old_lo = lo2;
 
     lo2 -= UINT64_MAX;
@@ -48,29 +48,21 @@ inline Fp fp_from_words(uint64_t lo, uint64_t hi) {
     return Fp { lo, hi };
 }
 
-inline bool fp_eq(const Fp & a, const Fp & b) {
-    return a.lo == b.lo && a.hi == b.hi;
-}
-
 inline Fp fp_add(const Fp & a, const Fp & b) {
-    u128     t0 = (u128)a.lo + (u128)b.lo;
+    u128 t0 = (u128)a.lo + (u128)b.lo;
     uint64_t lo = (uint64_t)t0;
-    u128     t1 = (u128)a.hi + (u128)b.hi + (uint64_t)(t0 >> 64);
+    u128 t1 = (u128)a.hi + (u128)b.hi + (uint64_t)(t0 >> 64);
 
     return fp_from_words(lo, (uint64_t)t1);
 }
 
 inline Fp fp_neg(const Fp & a) {
-    if (a.lo == 0 && a.hi == 0) {
-        return a;
-    }
-
     u128 Plo = (u128)UINT64_MAX;
     u128 Phi = (u128)MASK63;
 
-    u128     t0 = Plo - a.lo;
+    u128 t0 = Plo - a.lo;
     uint64_t lo = (uint64_t)t0;
-    u128     t1 = Phi - a.hi - (uint64_t)(t0 >> 64);
+    u128 t1 = Phi - a.hi - (uint64_t)(t0 >> 64);
 
     return fp_from_words(lo, (uint64_t)t1);
 }
@@ -156,11 +148,11 @@ inline Fp fp_reduce256(uint64_t z0, uint64_t z1, uint64_t z2, uint64_t z3) {
     uint64_t H1 = (z2 >> 63) | (z3 << 1);
     uint64_t H2 = (z3 >> 63);
 
-    u128     t0 = (u128)L0 + (u128)H0;
+    u128 t0 = (u128)L0 + (u128)H0;
     uint64_t x0 = (uint64_t)t0;
     uint64_t c0 = (uint64_t)(t0 >> 64);
 
-    u128     t1 = (u128)L1 + (u128)H1 + (u128)c0;
+    u128 t1 = (u128)L1 + (u128)H1 + (u128)c0;
     uint64_t x1 = (uint64_t)t1;
     uint64_t c1 = (uint64_t)(t1 >> 64);
 
@@ -170,7 +162,7 @@ inline Fp fp_reduce256(uint64_t z0, uint64_t z1, uint64_t z2, uint64_t z3) {
     uint64_t YL1 = x1 & MASK63;
     uint64_t YH0 = (x1 >> 63) | (x2 << 1);
 
-    u128     s0 = (u128)YL0 + (u128)YH0;
+    u128 s0 = (u128)YL0 + (u128)YH0;
     uint64_t y0 = (uint64_t)s0;
     uint64_t cy = (uint64_t)(s0 >> 64);
     uint64_t y1 = YL1 + cy;
@@ -199,10 +191,6 @@ inline Fp fp_pow_u64(Fp a, uint64_t e) {
 }
 
 inline Fp fp_inv_ct(const Fp & a) {
-    if (a.lo == 0 && a.hi == 0) {
-        std::abort();
-    }
-
     const int W = 5;
     const int T = 1 << W;
 

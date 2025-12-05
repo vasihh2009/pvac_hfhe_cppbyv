@@ -10,6 +10,8 @@
 #include "../crypto/lpn.hpp"
 #include "../crypto/matrix.hpp"
 
+#include "../core/ct_safe.hpp"
+
 namespace pvac {
 
 inline std::pair<int, int> plan_noise(const PubKey & pk, int depth_hint) {
@@ -29,11 +31,11 @@ inline std::pair<int, int> plan_noise(const PubKey & pk, int depth_hint) {
 }
 
 inline double sigma_density(const PubKey & pk, const Cipher & C) {
-    long double ones  = 0;
+    long double ones = 0;
     long double total = 0;
 
     for (const auto & e : C.E) {
-        ones  += e.s.popcnt();
+        ones += e.s.popcnt();
         total += (long double)pk.prm.m_bits;
     }
 
@@ -41,8 +43,6 @@ inline double sigma_density(const PubKey & pk, const Cipher & C) {
         return 0.0;
     }
 
-
-    
     return (double)(ones / total);
 }
 
@@ -66,7 +66,7 @@ inline void compact_edges(const PubKey & pk, Cipher & C) {
     auto ensureP = [&](Agg & a) {
         if (!a.have_p) {
             a.wp = fp_from_u64(0);
-            a.sp  = BitVec::make(pk.prm.m_bits);
+            a.sp = BitVec::make(pk.prm.m_bits);
             a.have_p = true;
         }
     };
@@ -97,7 +97,7 @@ inline void compact_edges(const PubKey & pk, Cipher & C) {
     out.reserve(C.E.size());
 
     auto nz = [&](const Fp & w, const BitVec & s) {
-        return !(w.lo == 0 && w.hi == 0) || (s.popcnt() != 0);
+        return ct::fp_is_nonzero(w) || (s.popcnt() != 0);
     };
 
     for (size_t lid = 0; lid < L; lid++) {
@@ -107,26 +107,64 @@ inline void compact_edges(const PubKey & pk, Cipher & C) {
             if (a.have_p && nz(a.wp, a.sp)) {
                 Edge e;
                 e.layer_id = (uint32_t)lid;
-                e.idx      = (uint16_t)k;
-                e.ch       = SGN_P;
-                e.w        = a.wp;
-                e.s        = a.sp;
+                e.idx = (uint16_t)k;
+                e.ch = SGN_P;
+                e.w = a.wp;
+                e.s = a.sp;
                 out.push_back(std::move(e));
             }
 
             if (a.have_m && nz(a.wm, a.sm)) {
                 Edge e;
                 e.layer_id = (uint32_t)lid;
-                e.idx      = (uint16_t)k;
-                e.ch       = SGN_M;
-                e.w        = a.wm;
-                e.s        = a.sm;
+                e.idx = (uint16_t)k;
+                e.ch = SGN_M;
+                e.w = a.wm;
+                e.s = a.sm;
                 out.push_back(std::move(e));
             }
         }
     }
 
     C.E.swap(out);
+}
+
+inline void compact_layers(Cipher& C) {
+    const size_t L = C.L.size();
+    if (L == 0) return;
+    
+    std::vector<uint8_t> used(L, 0);
+    
+    for (const auto& e : C.E)
+        if (e.layer_id < L) used[e.layer_id] = 1;
+    
+    for (bool changed = true; changed; ) {
+        changed = false;
+        for (size_t lid = 0; lid < L; ++lid) {
+            if (!used[lid] || C.L[lid].rule != RRule::PROD) continue;
+            auto mark = [&](uint32_t p) {
+                if (p < L && !used[p]) { used[p] = 1; changed = true; }
+            };
+            mark(C.L[lid].pa);
+            mark(C.L[lid].pb);
+        }
+    }
+    
+    std::vector<uint32_t> remap(L, UINT32_MAX);
+    std::vector<Layer> newL;
+    newL.reserve(L);
+    
+    for (size_t lid = 0; lid < L; ++lid)
+        if (used[lid]) { remap[lid] = (uint32_t)newL.size(); newL.push_back(C.L[lid]); }
+    
+    if (newL.size() == L) return;
+    
+    for (auto& Lr : newL)
+        if (Lr.rule == RRule::PROD) { Lr.pa = remap[Lr.pa]; Lr.pb = remap[Lr.pb]; }
+    
+    for (auto& e : C.E) e.layer_id = remap[e.layer_id];
+    
+    C.L.swap(newL);
 }
 
 inline void guard_budget(const PubKey & pk, Cipher & C, const char * where) {
@@ -141,19 +179,15 @@ inline void guard_budget(const PubKey & pk, Cipher & C, const char * where) {
 inline Cipher enc_fp_depth(
     const PubKey & pk,
     const SecKey & sk,
-    const Fp &     v,
-
-    int            depth_hint
+    const Fp & v,
+    int depth_hint
 ) {
     Cipher C;
 
-
     Layer L;
-    L.rule       = RRule::BASE; // RULE??? todo: r_x for all rules
-
+    L.rule = RRule::BASE;
     L.seed.nonce = make_nonce128();
-
-    L.seed.ztag  = prg_layer_ztag(pk.canon_tag, L.seed.nonce);
+    L.seed.ztag = prg_layer_ztag(pk.canon_tag, L.seed.nonce);
     C.L.push_back(L);
 
     const int S = 8;
@@ -165,69 +199,57 @@ inline Cipher enc_fp_depth(
     for (int j = 0; j < S; j++) {
         int x;
         do {
-             x = (int)(csprng_u64() % (uint64_t)pk.prm.B);
+            x = (int)(csprng_u64() % (uint64_t)pk.prm.B);
         } while (used.count(x));
         used.insert(x);
         idx[j] = x;
     }
 
     std::vector<uint8_t> ch(S);
-    for (int i = 0; i < S; i++) 
-    {
+    for (int i = 0; i < S; i++) {
         ch[i] = (uint8_t)(csprng_u64() & 1ull);
     }
 
     std::vector<Fp> r(S);
 
     Fp sum1 = fp_from_u64(0);
-
     Fp sumg = fp_from_u64(0);
 
-
     for (int j = 0; j < S - 2; j++) {
-        r[j]  = rand_fp_nonzero();
+        r[j] = rand_fp_nonzero();
         int s = sgn_val(ch[j]);
         sum1 = (s > 0) ? fp_add(sum1, r[j]) : fp_sub(sum1, r[j]);
 
         Fp term = fp_mul(r[j], pk.powg_B[idx[j]]);
-        
-        sumg    = (s > 0) ? fp_add(sumg, term) : fp_sub(sumg, term);
+        sumg = (s > 0) ? fp_add(sumg, term) : fp_sub(sumg, term);
     }
 
-
-
-    // not sure (need to check)
-
-    int     ia    = idx[S - 2];
-    int     ib    = idx[S - 1];
+    int ia = idx[S - 2];
+    int ib = idx[S - 1];
     uint8_t sa_ch = ch[S - 2];
     uint8_t sb_ch = ch[S - 1];
-    int     sa    = sgn_val(sa_ch);
-    int     sb    = sgn_val(sb_ch);
-
-    //
+    int sa = sgn_val(sa_ch);
+    int sb = sgn_val(sb_ch);
 
     Fp ga = pk.powg_B[ia];
     Fp gb = pk.powg_B[ib];
 
-    Fp V   = fp_sub(v, sumg);
+    Fp V = fp_sub(v, sumg);
     Fp rhs = fp_sub(fp_neg(fp_mul(sum1, ga)), V);
 
-    Fp den = fp_sub(ga, gb); // nVr
+    Fp den = fp_sub(ga, gb);
 
-    Fp rb  = fp_mul(rhs, fp_inv(den));
+    Fp rb = fp_mul(rhs, fp_inv(den));
 
     if (sb < 0) {
         rb = fp_neg(rb);
     }
 
     Fp tmp = (sb > 0) ? fp_sub(fp_neg(sum1), rb) : fp_add(fp_neg(sum1), rb);
-    Fp ra  = (sa > 0) ? tmp : fp_neg(tmp);
+    Fp ra = (sa > 0) ? tmp : fp_neg(tmp);
 
     r[S - 2] = ra;
-
     r[S - 1] = rb;
-
 
     Fp R = prf_R(pk, sk, L.seed);
 
@@ -242,8 +264,8 @@ inline Cipher enc_fp_depth(
     }
 
     auto nz = plan_noise(pk, depth_hint);
-    int  Z2 = nz.first;
-    int  Z3 = nz.second;
+    int Z2 = nz.first;
+    int Z3 = nz.second;
 
     auto add_zero2 = [&](int i, int j) {
         if (i == j) {
@@ -291,10 +313,10 @@ inline Cipher enc_fp_depth(
             return;
         }
 
-        Fp a   = rand_fp_nonzero();
-        Fp b   = rand_fp_nonzero();
+        Fp a = rand_fp_nonzero();
+        Fp b = rand_fp_nonzero();
         Fp sum = fp_add(fp_mul(a, pk.powg_B[i]), fp_mul(b, pk.powg_B[j]));
-        Fp c   = fp_mul(fp_neg(sum), fp_inv(pk.powg_B[k]));
+        Fp c = fp_mul(fp_neg(sum), fp_inv(pk.powg_B[k]));
 
         Edge e1 {
             0,
@@ -350,8 +372,8 @@ inline Cipher enc_fp_depth(
 inline Cipher enc_value_depth(
     const PubKey & pk,
     const SecKey & sk,
-    uint64_t       v_u64,
-    int            depth_hint
+    uint64_t v_u64,
+    int depth_hint
 ) {
     return enc_fp_depth(pk, sk, fp_from_u64(v_u64), depth_hint);
 }
@@ -364,16 +386,16 @@ inline Cipher enc_zero_depth(const PubKey & pk, const SecKey & sk, int depth_hin
     Cipher Z;
 
     Layer L;
-    L.rule       = RRule::BASE;
+    L.rule = RRule::BASE;
     L.seed.nonce = make_nonce128();
-    L.seed.ztag  = prg_layer_ztag(pk.canon_tag, L.seed.nonce);
+    L.seed.ztag = prg_layer_ztag(pk.canon_tag, L.seed.nonce);
     Z.L.push_back(L);
 
     Fp R = prf_R(pk, sk, L.seed);
 
     auto nz = plan_noise(pk, depth_hint);
-    int  Z2 = nz.first;
-    int  Z3 = nz.second;
+    int Z2 = nz.first;
+    int Z3 = nz.second;
 
     for (int t = 0; t < Z2; t++) {
         int i = (int)(csprng_u64() % (uint64_t)pk.prm.B);
@@ -422,10 +444,10 @@ inline Cipher enc_zero_depth(const PubKey & pk, const SecKey & sk, int depth_hin
             k = (int)(csprng_u64() % (uint64_t)pk.prm.B);
         } while (k == i || k == j);
 
-        Fp a   = rand_fp_nonzero();
-        Fp b   = rand_fp_nonzero();
+        Fp a = rand_fp_nonzero();
+        Fp b = rand_fp_nonzero();
         Fp sum = fp_add(fp_mul(a, pk.powg_B[i]), fp_mul(b, pk.powg_B[j]));
-        Fp c   = fp_mul(fp_neg(sum), fp_inv(pk.powg_B[k]));
+        Fp c = fp_mul(fp_neg(sum), fp_inv(pk.powg_B[k]));
 
         Edge e1 {
             0,

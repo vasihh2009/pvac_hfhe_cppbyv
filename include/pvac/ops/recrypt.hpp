@@ -9,21 +9,12 @@
 
 namespace pvac {
 
-inline EvalKey make_evalkey(
-    const PubKey& pk,
-    const SecKey& sk,
-    size_t zero_pool_size,
-    int depth_hint
-) {
+inline EvalKey make_evalkey(const PubKey& pk, const SecKey& sk, size_t pool_size, int depth_hint) {
     EvalKey ek;
-
-    ek.zero_pool.reserve(zero_pool_size);
-    for (size_t i = 0; i < zero_pool_size; i++) {
+    ek.zero_pool.reserve(pool_size);
+    for (size_t i = 0; i < pool_size; ++i)
         ek.zero_pool.push_back(enc_zero_depth(pk, sk, depth_hint));
-    }
-
     ek.enc_one = enc_value(pk, sk, 1);
-
     return ek;
 }
 
@@ -32,28 +23,20 @@ inline bool sigma_needs_balance(const PubKey& pk, const Cipher& C) {
     return d < 0.495 || d > 0.505;
 }
 
-inline Cipher ct_recrypt(
-    const PubKey& pk,
-    const EvalKey& ek,
-    const Cipher& in
-) {
-    if (ek.zero_pool.empty()) {
-        return in;
-    }
-
+inline Cipher ct_recrypt(const PubKey& pk, const EvalKey& ek, const Cipher& in) {
+    if (ek.zero_pool.empty() || in.E.empty()) return in;
+    
     Cipher result = in;
-
-    for (int it = 0; it < 8 && sigma_needs_balance(pk, result); it++) {
+    
+    for (int it = 0; it < 8 && sigma_needs_balance(pk, result); ++it) {
         size_t idx = csprng_u64() % ek.zero_pool.size();
-        const Cipher& zero = ek.zero_pool[idx];
-
-        result = ct_add(pk, result, zero);
+        result = ct_add(pk, result, ek.zero_pool[idx]);
         ubk_apply(pk, result);
         guard_budget(pk, result, "recrypt");
     }
-
+    
     compact_edges(pk, result);
-
+    compact_layers(result);
     return result;
 }
 

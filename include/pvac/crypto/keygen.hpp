@@ -5,6 +5,8 @@
 #include <iostream>
 
 #include "../core/types.hpp"
+#include "../core/ct_safe.hpp"
+
 #include "matrix.hpp"
 
 namespace pvac {
@@ -28,7 +30,6 @@ inline std::vector<int> factor_small(int n) {
     }
 
     return p;
-
 }
 
 inline void keygen(const Params & prm, PubKey & pk, SecKey & sk) {
@@ -38,7 +39,6 @@ inline void keygen(const Params & prm, PubKey & pk, SecKey & sk) {
 
     if ((pm1 % (u128)pk.prm.B) != 0) {
         std::cerr << "[keygen] B|(p-1) fail\n";
-        
         std::abort();
     }
 
@@ -58,7 +58,7 @@ inline void keygen(const Params & prm, PubKey & pk, SecKey & sk) {
         for (;;) {
             Fp x = fp_from_words(csprng_u64(), csprng_u64() & MASK63);
 
-            if (x.lo || x.hi) {
+            if (ct::fp_is_nonzero(x)) {
                 return x;
             }
         }
@@ -67,10 +67,10 @@ inline void keygen(const Params & prm, PubKey & pk, SecKey & sk) {
     Fp g;
 
     for (;;) {
-        Fp   h    = rand_fp();
-        Fp   base = h;
-        Fp   acc  = fp_from_u64(1);
-        u128 e    = E;
+        Fp h = rand_fp();
+        Fp base = h;
+        Fp acc = fp_from_u64(1);
+        u128 e = E;
 
         while (e) {
             if (e & 1) {
@@ -81,7 +81,7 @@ inline void keygen(const Params & prm, PubKey & pk, SecKey & sk) {
             e >>= 1;
         }
 
-        if (!(acc.lo == 1 && acc.hi == 0)) {
+        if (!ct::fp_is_one(acc)) {
             g = acc;
             break;
         }
@@ -100,7 +100,7 @@ inline void keygen(const Params & prm, PubKey & pk, SecKey & sk) {
         Fp h = rand_fp();
         Fp w = fp_pow_u64(h, (uint64_t)(pm1 / (u128)pk.prm.B));
 
-        if (w.lo == 1 && w.hi == 0) {
+        if (ct::fp_is_one(w)) {
             continue;
         }
 
@@ -109,7 +109,7 @@ inline void keygen(const Params & prm, PubKey & pk, SecKey & sk) {
         for (int p : primes) {
             Fp t = fp_pow_u64(w, (uint64_t)(pk.prm.B / p));
 
-            if (t.lo == 1 && t.hi == 0) {
+            if (ct::fp_is_one(t)) {
                 ok = false;
                 break;
             }
