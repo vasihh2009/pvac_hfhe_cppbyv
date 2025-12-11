@@ -44,12 +44,43 @@ $(BUILD)/test_zero: $(TESTS)/test_zero.cpp | $(BUILD)
 $(BUILD)/test_lpn: $(TESTS)/test_lpn.cpp | $(BUILD)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
+$(BUILD)/test_fp_core: $(TESTS)/test_fp_core.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD)/test_bitvec: $(TESTS)/test_bitvec.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD)/test_prf_ext: $(TESTS)/test_prf_ext.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD)/test_sigma_lpn: $(TESTS)/test_sigma_lpn.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD)/test_noise_struct: $(TESTS)/test_noise_struct.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD)/test_ct_fuzz: $(TESTS)/test_ct_fuzz.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD)/test_ct_safe: $(TESTS)/test_ct_safe.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD)/test_aes_ctr: $(TESTS)/test_aes_ctr.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ $<
 
 debug: $(BUILD)/test_main_debug
 sanitize: $(BUILD)/test_main_san
 examples: $(BUILD)/basic_usage
 test_zero: $(BUILD)/test_zero
 test_lpn: $(BUILD)/test_lpn
+test_fp_core: $(BUILD)/test_fp_core
+test_bitvec: $(BUILD)/test_bitvec
+test_prf_ext: $(BUILD)/test_prf_ext
+test_sigma_lpn: $(BUILD)/test_sigma_lpn
+test_noise_struct: $(BUILD)/test_noise_struct
+test_ct_fuzz: $(BUILD)/test_ct_fuzz
+test_ct_safe: $(BUILD)/test_ct_safe
+test_aes_ctr: $(BUILD)/test_aes_ctr
 
 
 test: $(BUILD)/test_main
@@ -81,6 +112,30 @@ test-zero: $(BUILD)/test_zero
 
 test-lpn: $(BUILD)/test_lpn
 	@./$(BUILD)/test_lpn
+
+test-fp-core: $(BUILD)/test_fp_core
+	@./$(BUILD)/test_fp_core
+
+test-bitvec: $(BUILD)/test_bitvec
+	@./$(BUILD)/test_bitvec
+
+test-prf-ext: $(BUILD)/test_prf_ext
+	@./$(BUILD)/test_prf_ext
+
+test-sigma-lpn: $(BUILD)/test_sigma_lpn
+	@./$(BUILD)/test_sigma_lpn
+
+test-noise-struct: $(BUILD)/test_noise_struct
+	@./$(BUILD)/test_noise_struct
+
+test-ct-fuzz: $(BUILD)/test_ct_fuzz
+	@./$(BUILD)/test_ct_fuzz
+
+test-ct-safe: $(BUILD)/test_ct_safe
+	@./$(BUILD)/test_ct_safe
+
+test-aes-ctr: $(BUILD)/test_aes_ctr
+	@./$(BUILD)/test_aes_ctr
 
 clean:
 	rm -rf $(BUILD) pvac_metrics.csv
