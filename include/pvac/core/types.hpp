@@ -12,19 +12,23 @@ namespace pvac {
 
 // (separations) don't touch it at all 
 namespace Dom {
-    inline constexpr const char * H_GEN = "pv|h";
-    inline constexpr const char * X_SEED = "pv|sx";
-    inline constexpr const char * NOISE = "pv|sn";
+    inline constexpr const char* H_GEN = "pvac.dom.h_gen";
+    inline constexpr const char* X_SEED = "pvac.dom.x_seed";
+    inline constexpr const char* NOISE = "pvac.dom.noise";
     
-    inline constexpr const char * PRF_LPN = "pv|pr";
-    inline constexpr const char * TOEP = "pv|tp";
+    inline constexpr const char* PRF_LPN = "pvac.dom.prf_lpn";
+    inline constexpr const char* TOEP = "pvac.dom.toeplitz";
 
-    inline constexpr const char * ZTAG = "pv|zt";
-    inline constexpr const char * COMMIT = "pv|cm";
+    inline constexpr const char* ZTAG = "pvac.dom.ztag";
+    inline constexpr const char* COMMIT = "pvac.dom.commit";
 
-    inline constexpr const char * PRF_R1 = "pv|r1";
-    inline constexpr const char * PRF_R2 = "pv|r2";
-    inline constexpr const char * PRF_R3 = "pv|r3";
+    inline constexpr const char* PRF_R1 = "pvac.prf.r.1";
+    inline constexpr const char* PRF_R2 = "pvac.prf.r.2";
+    inline constexpr const char* PRF_R3 = "pvac.prf.r.3";
+
+    inline constexpr const char* PRF_NOISE1 = "pvac.prf.noise.1";
+    inline constexpr const char* PRF_NOISE2 = "pvac.prf.noise.2";
+    inline constexpr const char* PRF_NOISE3 = "pvac.prf.noise.3";
 }
 
 

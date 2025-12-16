@@ -267,4 +267,11 @@ inline Fp prf_R(const PubKey& pk, const SecKey& sk, const RSeed& seed) {
     return fp_mul(fp_mul(r1, r2), r3);
 }
 
+inline Fp prf_R_noise(const PubKey& pk, const SecKey& sk, const RSeed& seed) {
+    Fp r1 = prf_R_core(pk, sk, seed, Dom::PRF_NOISE1);
+    Fp r2 = prf_R_core(pk, sk, seed, Dom::PRF_NOISE2);
+    Fp r3 = prf_R_core(pk, sk, seed, Dom::PRF_NOISE3);
+    return fp_mul(fp_mul(r1, r2), r3);
+}
+
 }

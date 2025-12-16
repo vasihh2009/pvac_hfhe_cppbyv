@@ -294,7 +294,8 @@ int main() {
 
 
     // you have to attack this string, it is in the ciphertext file after enc is performed
-    const std::string seed = "word1 word2 etc......XXX...>XXX> word12"; 
+    // new add
+    const std::string seed = ""; 
     //
 
 

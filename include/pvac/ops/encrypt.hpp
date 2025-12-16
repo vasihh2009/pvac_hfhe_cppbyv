@@ -110,14 +110,22 @@ inline void guard_budget(const PubKey& pk, Cipher& C, const char* where) {
     }
 }
 
-// ndt
+// ndt (new)
 inline Fp prf_noise_delta(const PubKey& pk, const SecKey& sk,
                           const RSeed& base_seed, uint32_t group_id, uint8_t kind) {
     RSeed s2 = base_seed;
-    s2.nonce.lo ^= 0x9e3779b97f4a7c15ull * (uint64_t)group_id ^ (uint64_t)kind;
-    s2.nonce.hi ^= 0x94d049bb133111ebull * (uint64_t)group_id ^ ((uint64_t)kind << 32);
-    s2.ztag     ^= 0x517cc1b727220a95ull * (uint64_t)group_id ^ ((uint64_t)kind << 48);
-    return prf_R(pk, sk, s2);
+    uint64_t g = (uint64_t)group_id + 1;
+    uint64_t k = (uint64_t)kind + 1;
+
+    s2.nonce.lo ^= 0x9e3779b97f4a7c15ull * g;
+    s2.nonce.hi ^= 0x94d049bb133111ebull * g;
+    s2.ztag ^= 0x517cc1b727220a95ull * g;
+
+    s2.nonce.lo ^= k;
+    s2.nonce.hi ^= (k << 32);
+    s2.ztag ^= (k << 48);
+
+    return prf_R_noise(pk, sk, s2);
 }
 
 inline int pick_unique_idx(int B, std::unordered_set<int>& used) {
